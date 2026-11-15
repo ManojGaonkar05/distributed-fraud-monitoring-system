@@ -19,7 +19,7 @@ VM2 runs the only application code. VM3 and VM4 receive executor tasks from Spar
 - R4: >= 3 unique payments from a source account to the same destination in any such window.
 - R5: number of active rules R1-R4 is the risk score; >= 2 is BLOCK, 1 is REVIEW, otherwise APPROVE.
 
-The evaluated rule flags for a transaction are the union of its qualifying overlapping windows for its source account. This matches the supplied baseline: a transaction in a qualifying R4 account/window can have R4 active even when another transaction in that window is the one sent to the flagged destination; the alert's `supporting_transaction_ids` still lists only payments to that destination. R2-R4 alert rows are emitted once per qualifying `(rule, account, destination, window)` key. Alert identifiers are deterministic and use UTC window-start times.
+The evaluated rule flags for a transaction are the union of its qualifying overlapping windows for its source account. This matches the supplied baseline: a transaction in a qualifying R4 account/window can have R4 active even when another transaction in that window is the one sent to the flagged destination; the alert's `supporting_transaction_ids` still lists only payments to that destination. The PDF requires one alert per account/window/rule but does not define how to represent multiple qualifying R4 destinations in one window. The supplied fixture selects the destination with the largest support count; this implementation does that and uses first-seen order to break ties. R2-R4 alert rows are emitted once per account/window/rule. Alert identifiers are deterministic and use UTC window-start times.
 
 ## Event-time/state design
 

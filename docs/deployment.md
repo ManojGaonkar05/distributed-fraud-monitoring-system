@@ -5,12 +5,12 @@ Ubuntu 22.04/24.04 is assumed. Pin matching Java and Spark versions on all Spark
 ## VM1: Kafka and producer
 
 1. Install/start Kafka and configure its advertised listener to the VM1 address reachable from VM2.
-2. Copy `config/example.env` to `.env`, set `KAFKA_BOOTSTRAP_SERVERS`, install `requirements.txt`, and securely copy `transactions.csv` into `data/transactions.csv`.
+2. Copy only `producer/`, `config/example.env`, `requirements.txt`, and the Kafka/producer startup scripts to VM1. Set `KAFKA_BOOTSTRAP_SERVERS`, install `requirements.txt`, and securely copy `transactions.csv` into `data/transactions.csv`. Do not copy the Spark streaming application to VM1.
 3. Run `bash scripts/start_kafka.sh` in one terminal. In another, run `bash scripts/create_topic.sh`, then `bash scripts/start_producer.sh`. CSV order is preserved by default. Producer pacing and bounded disorder options are described with `python -m producer.transaction_producer --help`.
 
 ## VM2: Spark master, driver, application
 
-1. Copy the repository to VM2 and set `.env` with the VM hostnames, run ID, and thresholds. Securely copy `transactions.csv` into `data/transactions.csv` for producer startup.
+1. Copy the repository to VM2 and set `.env` with the VM hostnames, run ID, and thresholds. VM2 hosts and submits the only copy of `streaming/fraud_stream.py`.
 2. Install Java and Spark 3.5.3, configure the master at `SPARK_MASTER`, and ensure VM3/VM4 workers connect to it.
 3. Confirm Kafka is reachable and the Iceberg/HDFS endpoints resolve.
 4. Run `bash scripts/submit_stream.sh`. It submits `streaming/fraud_stream.py` from VM2 and places its checkpoint in HDFS.
@@ -24,8 +24,6 @@ Ubuntu 22.04/24.04 is assumed. Pin matching Java and Spark versions on all Spark
 
 ```bash
 python -m verifier.verify_outputs \
-  --actual-decisions exports/transaction_decisions.csv \
-  --actual-alerts exports/account_risk_alerts.csv \
   --expected-decisions data/ground_truth_transaction_decisions.csv \
   --expected-alerts data/ground_truth_account_risk_alerts.csv \
   --report reports/run1.json
@@ -41,4 +39,4 @@ The verifier exits 0 on PASS and 1 on FAIL. It queries Iceberg through Spark Thr
 
 ## Baseline run
 
-Use a fresh topic/table/checkpoint name such as `run1`. Run the full CSV once with `bash scripts/start_producer.sh --once`, let event-time windows drain, then run the verifier. Do not reuse a checkpoint for a new run. Use the same topic, tables, and checkpoint only for an intentional restart experiment.
+Use a fresh source topic, deduplicated topic, tables, and checkpoint name such as `run1`. Run the full CSV once with `bash scripts/start_producer.sh --once`, let the control watermark drain the event-time windows, then run the verifier. Do not reuse a checkpoint for a new run. Use the same topics, tables, and checkpoints only for an intentional restart experiment.
