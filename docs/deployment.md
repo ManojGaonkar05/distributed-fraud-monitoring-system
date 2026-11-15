@@ -17,9 +17,9 @@ Ubuntu 22.04/24.04 is assumed. Pin matching Java and Spark versions on all Spark
 
 ## VM3: worker, HDFS, Iceberg, verifier
 
-1. Install/start one HDFS NameNode and DataNode on VM3. This single-node HDFS is intentional for this project.
-2. Create the HDFS warehouse/checkpoint directories with `bash scripts/setup_hdfs.sh` (run as the HDFS owner).
-3. Start a Spark worker against VM2's master. Configure the same Iceberg catalog and warehouse as VM2.
+1. Install/configure one HDFS NameNode and DataNode on VM3. On VM3 and every HDFS client, set `fs.defaultFS` in `core-site.xml` to `HDFS_NAMENODE_URI`. On VM3 set the NameNode/DataNode storage directories and `dfs.replication=1` in `hdfs-site.xml`. Format a brand-new NameNode once using the Hadoop administration procedure before its first start; do not format an existing namespace.
+2. Start HDFS with `bash scripts/start_hdfs.sh`, then create the HDFS warehouse/checkpoint directories with `bash scripts/setup_hdfs.sh` (run as the HDFS owner).
+3. Start a Spark worker against VM2's master. Configure the same HDFS client files, Iceberg catalog, and warehouse as VM2.
 4. Copy only `verifier/` and the two ground-truth CSVs to VM3, install Python requirements, set `SPARK_THRIFT_HOST=vm4` and the same run/table settings, and run the verifier. It reads both Iceberg tables through Spark Thrift Server; CSV paths can be passed for offline comparison. Keep the streaming application source on VM2. Example:
 
 ```bash
