@@ -21,4 +21,4 @@ The supplied inputs contain 2,000 transaction rows but only 1,990 unique transac
 
 ## Local development
 
-Install Python dependencies with `python -m pip install -r requirements.txt`. Run the verifier against the Iceberg tables through Spark Thrift Server; optional CSV exports are supported for offline comparison. Full end-to-end validation requires the four VMs.
+Install Python dependencies with `python -m pip install -r requirements.txt`. Run the verifier against exported Iceberg CSVs as described in `docs/deployment.md`. Full end-to-end validation requires the four VMs.

@@ -3,13 +3,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from dotenv import load_dotenv
 
 
 def norm(value: Any) -> Any:
@@ -151,10 +149,9 @@ def main() -> None:
     parser.add_argument("--expected-decisions", type=Path, default=Path("data/ground_truth_transaction_decisions.csv"))
     parser.add_argument("--expected-alerts", type=Path, default=Path("data/ground_truth_account_risk_alerts.csv"))
     parser.add_argument("--report", type=Path, default=Path("reports/verification.json"))
-    load_dotenv()
-    parser.add_argument("--thrift-host", default=os.getenv("SPARK_THRIFT_HOST", "vm4"))
-    parser.add_argument("--thrift-port", type=int, default=int(os.getenv("SPARK_THRIFT_PORT", "10000")))
-    parser.add_argument("--thrift-user", default=os.getenv("SPARK_THRIFT_USER", "verifier"))
+    parser.add_argument("--thrift-host", default=__import__("os").getenv("SPARK_THRIFT_HOST", "vm4"))
+    parser.add_argument("--thrift-port", type=int, default=int(__import__("os").getenv("SPARK_THRIFT_PORT", "10000")))
+    parser.add_argument("--thrift-user", default=__import__("os").getenv("SPARK_THRIFT_USER", "verifier"))
     args = parser.parse_args()
     expected_d, expected_a = pd.read_csv(args.expected_decisions), pd.read_csv(args.expected_alerts)
     if args.actual_decisions and args.actual_alerts:
@@ -162,6 +159,7 @@ def main() -> None:
     elif args.actual_decisions or args.actual_alerts:
         parser.error("provide both actual CSV paths, or omit both to query Iceberg")
     else:
+        import os
         catalog = os.getenv("ICEBERG_CATALOG", "lab")
         run_id = os.getenv("RUN_ID", "run1")
         decisions_table = os.getenv("TRANSACTION_TABLE", f"{catalog}.fraud.transaction_decisions_{run_id}")

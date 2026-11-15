@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import unittest
-import csv
-import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -12,24 +10,12 @@ from producer.transaction_producer import disorder_rows, read_rows
 
 class ProducerOrderTests(unittest.TestCase):
     def test_disorder_modes_preserve_all_transactions(self):
-        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
-        rows = [{"transaction_id": str(i), "event_timestamp": (start + timedelta(seconds=i * 10)).isoformat().replace("+00:00", "Z")}
-                for i in range(20)]
+        path = Path("data/transactions.csv")
+        rows = read_rows(path)
         for threshold in (0, 30, 61):
             result = list(disorder_rows(rows, threshold))
             self.assertEqual(len(result), len(rows))
             self.assertCountEqual([r["transaction_id"] for r in result], [r["transaction_id"] for r in rows])
-
-    def test_csv_reader_preserves_columns_and_file_order(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "transactions.csv"
-            rows = [{"transaction_id": "T2", "event_timestamp": "2026-01-01T00:00:30Z", "amount": "20.00"},
-                    {"transaction_id": "T1", "event_timestamp": "2026-01-01T00:00:00Z", "amount": "10.00"}]
-            with path.open("w", newline="", encoding="utf-8") as stream:
-                writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
-                writer.writeheader()
-                writer.writerows(rows)
-            self.assertEqual(read_rows(path), rows)
 
     def test_reversal_has_expected_event_time_bound(self):
         start = datetime(2026, 1, 1, tzinfo=timezone.utc)

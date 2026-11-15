@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -68,8 +68,8 @@ def disorder_rows(rows: list[dict[str, str]], minimum_seconds: int = 0):
 def publish(rows: list[dict[str, str]], bootstrap: str, topic: str, interval: float,
             duplicate_every: int = 0, disorder_seconds: int = 0, loop: bool = True) -> None:
     """Publish input order or the explicitly selected bounded disorder test sequence."""
-    if interval < 0 or duplicate_every < 0 or disorder_seconds < 0 or disorder_seconds > 120 or disorder_seconds == 60 or (0 < disorder_seconds < 30):
-        raise ValueError("use disorder_seconds=0, 30-59, or 61-120; other settings are invalid")
+    if interval < 0 or duplicate_every < 0 or disorder_seconds < 0:
+        raise ValueError("interval, duplicate_every and disorder_seconds must be non-negative")
     from kafka import KafkaProducer
     producer = KafkaProducer(bootstrap_servers=[v.strip() for v in bootstrap.split(",")],
         client_id=os.getenv("KAFKA_CLIENT_ID", "fraud-producer"),
@@ -93,18 +93,6 @@ def publish(rows: list[dict[str, str]], bootstrap: str, topic: str, interval: fl
             for row in disorder_rows(rows, disorder_seconds):
                 send(row)
             producer.flush(timeout=60)
-            if not loop:
-                last_event = max(datetime.fromisoformat(row["event_timestamp"].replace("Z", "+00:00")) for row in rows)
-                marker_time = (last_event + timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
-                marker_id = f"__WATERMARK__{pass_number}"
-                marker = {"event_id": marker_id, "transaction_id": marker_id, "user_id": "CONTROL",
-                    "customer_id": "CONTROL", "source_account": "__CONTROL__", "destination_account": "__CONTROL__",
-                    "merchant_id": "CONTROL", "device_id": "CONTROL", "event_timestamp": marker_time,
-                    "amount": "0.00", "currency": "INR", "transaction_type": "PAYMENT",
-                    "location": "CONTROL", "channel": "CONTROL", "account_age_days": "0", "record_kind": "WATERMARK"}
-                producer.send(topic, value=marker, key=marker_id.encode("utf-8"))
-                producer.flush(timeout=60)
-                logging.info("Published end-of-input watermark marker at %s", marker_time)
             logging.info("Completed input pass %s (%s input rows)", pass_number, len(rows))
             if not loop:
                 break

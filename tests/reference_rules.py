@@ -74,11 +74,6 @@ def evaluate(transactions: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 if __name__ == "__main__":
-    required = [ROOT / "data/transactions.csv", ROOT / "data/ground_truth_transaction_decisions.csv",
-                ROOT / "data/ground_truth_account_risk_alerts.csv"]
-    missing = [str(path) for path in required if not path.exists()]
-    if missing:
-        raise SystemExit("Stage the supplied CSV files first: " + ", ".join(missing))
     tx = pd.read_csv(ROOT / "data/transactions.csv")
     expected_d = pd.read_csv(ROOT / "data/ground_truth_transaction_decisions.csv")
     expected_a = pd.read_csv(ROOT / "data/ground_truth_account_risk_alerts.csv")
