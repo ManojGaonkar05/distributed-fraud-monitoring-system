@@ -653,3 +653,230 @@ The supplied transaction input contains 2,000 rows and 1,990 unique transaction 
 ---
 
 **Repository:** https://github.com/ManojGaonkar05/distributed-fraud-monitoring-system
+
+
+## 14. Copy-and-run command checklist for the team
+
+This section puts the main commands in execution order. Run each block on the VM named in the heading. Replace every `VMx_IP` and `/your/actual/.../path` placeholder first.
+
+### A. All VMs — update the repository and prepare Python
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+git pull
+python3 --version
+java -version
+hostname -I
+```
+
+If the Python environment has not been created yet:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+If `.venv` already exists, activate it instead of creating it again:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+source .venv/bin/activate
+```
+
+### B. VM1 — start Kafka and create topic
+
+Terminal 1:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+export KAFKA_HOME=/your/actual/kafka/path
+export PATH="$KAFKA_HOME/bin:$PATH"
+bash scripts/start_kafka.sh
+```
+
+Terminal 2:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+source .venv/bin/activate
+export KAFKA_HOME=/your/actual/kafka/path
+export PATH="$KAFKA_HOME/bin:$PATH"
+bash scripts/create_topic.sh
+kafka-topics.sh --bootstrap-server VM1_IP:9092 --list
+```
+
+After the main Spark query is running on VM2, start the one-pass baseline producer:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+source .venv/bin/activate
+bash scripts/start_producer.sh --once
+```
+
+### C. VM3 — start HDFS and create storage directories
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+export HADOOP_HOME=/your/actual/hadoop/path
+export PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH"
+bash scripts/start_hdfs.sh
+jps
+```
+
+Only continue when NameNode and DataNode are running. Then:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+bash scripts/setup_hdfs.sh
+hdfs dfsadmin -report
+hdfs dfs -ls /
+hdfs dfs -ls /checkpoints
+hdfs dfs -ls /warehouse
+```
+
+### D. VM2 — start Spark Master
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+export SPARK_HOME=/your/actual/spark/path
+export PATH="$SPARK_HOME/bin:$SPARK_HOME/sbin:$PATH"
+export SPARK_MASTER_HOST=VM2_IP
+bash scripts/start_spark_master.sh
+```
+
+Open `http://VM2_IP:8080` and leave the Master running.
+
+### E. VM3 — start its Spark Worker
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+export SPARK_HOME=/your/actual/spark/path
+export PATH="$SPARK_HOME/bin:$SPARK_HOME/sbin:$PATH"
+export SPARK_MASTER=spark://VM2_IP:7077
+bash scripts/start_spark_worker.sh
+```
+
+### F. VM4 — start its Spark Worker
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+export SPARK_HOME=/your/actual/spark/path
+export PATH="$SPARK_HOME/bin:$SPARK_HOME/sbin:$PATH"
+export SPARK_MASTER=spark://VM2_IP:7077
+bash scripts/start_spark_worker.sh
+```
+
+Check the Master UI on VM2 and confirm both workers are listed as ALIVE.
+
+### G. VM4 — start Thrift Server and dashboard
+
+Terminal 1:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+export SPARK_HOME=/your/actual/spark/path
+export PATH="$SPARK_HOME/bin:$SPARK_HOME/sbin:$PATH"
+bash scripts/start_thrift_server.sh
+```
+
+Terminal 2:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+source .venv/bin/activate
+bash scripts/start_dashboard.sh
+```
+
+Open `http://VM4_IP:8501`.
+
+### H. VM2 — submit the streaming application
+
+Run only after Kafka, HDFS, Spark Master and both Spark Workers are ready:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+source .venv/bin/activate
+export SPARK_HOME=/your/actual/spark/path
+export PATH="$SPARK_HOME/bin:$SPARK_HOME/sbin:$PATH"
+nc -vz VM1_IP 9092
+nc -vz VM3_IP 9000
+bash scripts/submit_stream.sh
+```
+
+Keep this terminal running. Then go to VM1 and run the producer command in section B.
+
+### I. VM3 — verify the baseline output
+
+After the finite producer has finished and the stream has flushed its event-time windows:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+source .venv/bin/activate
+set -a
+source .env
+set +a
+python -m verifier.verify_outputs \
+  --expected-decisions data/ground_truth_transaction_decisions.csv \
+  --expected-alerts data/ground_truth_account_risk_alerts.csv \
+  --report reports/run1.json
+echo "Verifier exit code: $?"
+```
+
+Exit code 0 is PASS; exit code 1 is FAIL. Keep the report.
+
+### J. Stop services safely after a run
+
+Stop a foreground process with `Ctrl+C` in the terminal where it is running. For background services, use the matching stop scripts from the installed distributions:
+
+VM1 Kafka:
+
+```bash
+"$KAFKA_HOME/bin/kafka-server-stop.sh"
+```
+
+VM2 Spark Master:
+
+```bash
+"$SPARK_HOME/sbin/stop-master.sh"
+```
+
+VM3 and VM4 Spark Workers (run on each worker VM):
+
+```bash
+"$SPARK_HOME/sbin/stop-worker.sh"
+```
+
+VM3 HDFS (only after Spark jobs have stopped and the team has finished using HDFS):
+
+```bash
+"$HADOOP_HOME/sbin/stop-dfs.sh"
+```
+
+Do not stop services in the middle of a required experiment. For the Master/Driver recovery experiment, follow `docs/experiments.md` and preserve the same checkpoint rather than doing a normal clean shutdown.
+
+### K. Evaluation disorder producer commands
+
+Run each disorder experiment with a separate fresh run configuration/topic/checkpoint/table set. Start the streaming application for that run before starting the producer.
+
+Less than one minute:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+source .venv/bin/activate
+bash scripts/start_producer.sh --once --disorder-seconds 30
+```
+
+More than one minute:
+
+```bash
+cd ~/distributed-fraud-monitoring-system
+source .venv/bin/activate
+bash scripts/start_producer.sh --once --disorder-seconds 61
+```
+
+For the restart recovery experiment only, reuse the same run ID, Kafka topics, Iceberg tables and HDFS checkpoint. Do not reuse those resources for a separate fresh experiment.
+
+> **Installation note:** These project scripts start software that is already installed; they do not install Kafka, Hadoop or Spark. Their distribution/version and configuration must match the lab environment. The repository pins the Spark-side package coordinates in `scripts/submit_stream.sh`; do not guess a different Spark release or overwrite an existing working installation. If one of these platform tools is missing, first share the VM's OS/version and the output of the check commands in section 3 so the team can install the compatible distribution.
