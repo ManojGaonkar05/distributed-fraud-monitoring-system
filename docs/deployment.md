@@ -1,6 +1,6 @@
 # Four VM deployment guide
 
-Ubuntu 22.04/24.04 is assumed. Pin matching Java and Spark versions on all Spark nodes. The reference `scripts/submit_stream.sh` uses Spark 3.5.3, Scala 2.12, Iceberg 1.6.1, and the matching Spark Kafka connector. Install Python 3.10+ on VM1, VM3, and VM4. Open only lab network ports between named hosts; set addresses in `.env`, not in source.
+Ubuntu 22.04/24.04 is assumed. Pin matching Java and Spark versions on all Spark nodes. The reference `scripts/submit_stream.sh` uses Spark 3.5.3, Scala 2.12, Iceberg 1.6.1, and the matching Spark Kafka connector. Install Python 3.10+ and `requirements.txt` on VM1, VM2, VM3, and VM4; Spark workers need pandas and PyArrow for the keyed state function. Open only lab network ports between named hosts; set addresses in `.env`, not in source.
 
 ## VM1: Kafka and producer
 
